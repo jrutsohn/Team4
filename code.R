@@ -59,4 +59,3 @@ end-start
 mean(predict(svm.fit, data.test) == data.test$y) # accuracy
 
 
-?train
