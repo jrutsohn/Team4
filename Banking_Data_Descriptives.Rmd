@@ -2,7 +2,7 @@
 title: "Banking Data Descriptive Statistics"
 author: "Josh Rutsohn"
 date: "4/12/2020"
-output: html_document
+output: pdf_document
 ---
 
 ```{r}
