@@ -1,0 +1,46 @@
+---
+title: "Logistic and regularized logistic regression"
+author: "Tianyou Luo"
+date: "April 20, 2020"
+output: html_document
+---
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(glmnet)
+library(caret)
+library(modelr)
+
+dat = read_csv("imputedData.csv")
+
+dat_lasso = dat %>% select(-duration, -default)
+dat_lasso$y = as.factor(ifelse(dat_lasso$y == "yes", 1, 0))
+dat_lasso_matrix = model.matrix(y~., data=dat_lasso)
+cv_lasso = cv.glmnet(dat_lasso_matrix, dat_lasso$y, alpha = 1, nfolds = 5,
+                     family = "binomial", type.measure = "auc")
+plot(cv_lasso)
+```
+
+
+I first tried using LASSO to run logistic regression for feature selection. AUC was used as the metric and 5-fold cross validation was used. As we can see, the AUC almost monotonically decreased as the regularization parameter $\lambda$ increases, suggesting that there is actually little need to perform a feature selection. Therefore I will just use the classical logistic regression.
+
+```{r, message=FALSE}
+set.seed(2020)
+testfolds = createFolds(dat_lasso$y, k=5, list=TRUE, returnTrain = FALSE)
+logistic_pred = tibble()
+for (i in 1:5){
+  testset = dat_lasso[testfolds[[i]],]
+  trainset = dat_lasso[-testfolds[[i]],]
+  logit = glm(y ~ ., data = trainset, family="binomial")
+  test_pred = add_predictions(testset, logit, type = "response")
+  logistic_pred = rbind(logistic_pred, test_pred)
+}
+
+logistic_pred = logistic_pred %>%
+  mutate(pred_cat = ifelse(pred>=0.5, 1, 0))
+
+sum(logistic_pred$y == logistic_pred$pred_cat) / dim(dat)[1]
+pROC::roc(logistic_pred$y, logistic_pred$pred)$auc
+```
+
+We use a five fold cross validation to produce prediction for every subject. Using logistic regression, we could achieve a prediction accuracy of 0.899, and an AUC of 0.78.
