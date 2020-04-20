@@ -1,0 +1,255 @@
+---
+title: "Imputation"
+author: "Dongneuck Lee 730263510"
+date: "4/19/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(tidyverse)
+library(naniar)
+library(missForest)
+library(mice)
+```
+
+```{r}
+#library(data.table)
+data <- fread("bank-additional/bank-additional/bank-additional-full.csv")
+```
+
+## looking into data
+```{r}
+#View(data)
+names(data)
+dplyr::glimpse(data)
+
+sum(is.na(data))  ## No missing?? Missing is coded with "unknown". Also, this data is imbalanced because
+sum(data$y == "yes") / nrow(data)
+
+# as.factor
+data$job         <- as.factor(data$job)
+data$marital     <- as.factor(data$marital)
+data$education   <- as.factor(data$education) 
+data$default     <- as.factor(data$default)  
+data$housing     <- as.factor(data$housing)  
+data$loan        <- as.factor(data$loan) 
+data$contact     <- as.factor(data$contact)  
+data$month       <- as.factor(data$month) 
+data$day_of_week <- as.factor(data$day_of_week)
+data$poutcome    <- as.factor(data$poutcome)  
+data$y           <- as.factor(data$y)
+
+
+#library(tidyverse)
+data.test <- data
+
+ggplot(data=data.test) + geom_bar(aes(x=age)) ## no unknown
+ggplot(data=data.test) + geom_bar(aes(x=job)) ## small unknown
+ggplot(data=data.test) + geom_bar(aes(x=marital)) ## small unknown
+ggplot(data=data.test) + geom_bar(aes(x=education)) ## small unknown
+ggplot(data=data.test) + geom_bar(aes(x=default)) ## some unknown
+ggplot(data=data.test) + geom_bar(aes(x=housing)) ## some unknown
+ggplot(data=data.test) + geom_bar(aes(x=loan)) ## some unknown
+```
+
+Following variables don't have missing value
+```{r, eval=F, echo=T}
+
+ggplot(data=data.test) + geom_bar(aes(x=contact)) ## no unknown
+ggplot(data=data.test) + geom_bar(aes(x=month)) ## no unknown
+ggplot(data=data.test) + geom_bar(aes(x=day_of_week)) ## no unknown
+ggplot(data=data.test) + geom_bar(aes(x=duration)) ## no unknown
+
+ggplot(data=data.test) + geom_bar(aes(x=campaign)) ## no unknown
+ggplot(data=data.test) + geom_bar(aes(x=pdays))    ## no unknown// 999 means client was not previously contacted)
+  data.test %>%
+    filter(pdays < 50) %>%
+    ggplot() + geom_bar(aes(x=pdays)) 
+ggplot(data=data.test) + geom_bar(aes(x=previous)) ## no unknown
+ggplot(data=data.test) + geom_bar(aes(x=poutcome)) ## assume no unknown
+
+ggplot(data=data.test) + geom_bar(aes(x=emp.var.rate)) ## no unknown
+ggplot(data=data.test) + geom_bar(aes(x=cons.price.idx)) ## no unknown
+ggplot(data=data.test) + geom_bar(aes(x=cons.conf.idx))  ## no unknown
+ggplot(data=data.test) + geom_bar(aes(x=euribor3m))      ## no unknown
+ggplot(data=data.test) + geom_bar(aes(x=nr.employed))    ## no unknown
+
+ggplot(data=data.test) + geom_bar(aes(x=y))  ## no unknown
+
+```
+
+I think we don't need the variables 'month' and 'day_of_week' indicating the last contact day.
+
+1 999 in `pdays` means client was not previously contacted. I think setting this 0 instead of 999 might be better. It depends on the model we choose.
+
+Only categorical variables has unknown
+
+```{r}
+data.test <- data.test[,-c(9, 10)]  ## remove 'month' and 'day_of_week'
+```
+
+
+```{r}
+#library(naniar)
+sum(data.test=="unknown", na.rm = T)
+```
+
+This dataset has 12,718 missing values coded with "unknown". Let's replace them with NA's
+
+```{r}
+data.test <- data.test %>%
+  replace_with_na(replace = list(job="unknown", marital="unknown", education="unknown", 
+                                 default="unknown", housing="unknown", loan="unknown"))
+sum(data.test=="unknown", na.rm = T) #double check
+```
+
+# Simulation
+
+Before iputing NA's, we need to check which method imputes missings "better". There are two candidates, missForest and MICE. To campare them, I will generate fake missing and apply the candidates. The measurement will be proportion of falsely classified entries (PFC) over the categorical missing values.
+
+This is the simulation step.
+
+1. Extract rows without any missing. This data is called `complete` 
+
+2. For each colums, substitute elemets with NA (artificially produce missing values). Since we want the generated simluation data to be similar to the whole data as much as possible, the proportion of NA will be that of full data set. For example, job variables has missing at a rate of 0.8%. Therefore, seed NA's in `complete` at a rate of 0.8%.
+
+3. Repeat step2 five times. Then five simulation dataset is generated. Let's call them `sim1`, ..., `sim5`
+
+4. Apply missForest and MICE to `sim1`, ..., `sim5` and obtain PFC's. 
+
+5. Check which method has smaller PFC's.
+```{r}
+# Complete data
+complete <- data.test[complete.cases(data.test), ]
+sum(is.na(complete))
+
+# Artificially produce missing values using the 'prodNA' function (simulation purpose)
+#library(missForest) 
+n <- nrow(data.test)
+
+set.seed(1)
+sim1 <- complete
+sim1$job       <- prodNA( data.frame(job=complete$job) , sum(is.na(data.test$job))/ n)
+sim1$marital   <- prodNA( data.frame(marital=complete$marital) , sum(is.na(data.test$marital))/ n)
+sim1$education <- prodNA( data.frame(education=complete$education) , sum(is.na(data.test$education))/ n)
+sim1$default   <- prodNA( data.frame(default=complete$default) , sum(is.na(data.test$default))/ n)
+sim1$housing   <- prodNA( data.frame(housing=complete$housing) , sum(is.na(data.test$housing))/ n)
+sim1$loan      <- prodNA( data.frame(loan=complete$loan) , sum(is.na(data.test$loan))/ n)
+
+
+set.seed(2)
+sim2 <- complete
+sim2$job       <- prodNA( data.frame(job=complete$job) , sum(is.na(data.test$job))/ n)
+sim2$marital   <- prodNA( data.frame(marital=complete$marital) , sum(is.na(data.test$marital))/ n)
+sim2$education <- prodNA( data.frame(education=complete$education) , sum(is.na(data.test$education))/ n)
+sim2$default   <- prodNA( data.frame(default=complete$default) , sum(is.na(data.test$default))/ n)
+sim2$housing   <- prodNA( data.frame(housing=complete$housing) , sum(is.na(data.test$housing))/ n)
+sim2$loan      <- prodNA( data.frame(loan=complete$loan) , sum(is.na(data.test$loan))/ n)
+
+
+set.seed(3)
+sim3 <- complete
+sim3$job       <- prodNA( data.frame(job=complete$job) , sum(is.na(data.test$job))/ n)
+sim3$marital   <- prodNA( data.frame(marital=complete$marital) , sum(is.na(data.test$marital))/ n)
+sim3$education <- prodNA( data.frame(education=complete$education) , sum(is.na(data.test$education))/ n)
+sim3$default   <- prodNA( data.frame(default=complete$default) , sum(is.na(data.test$default))/ n)
+sim3$housing   <- prodNA( data.frame(housing=complete$housing) , sum(is.na(data.test$housing))/ n)
+sim3$loan      <- prodNA( data.frame(loan=complete$loan) , sum(is.na(data.test$loan))/ n)
+
+
+set.seed(4)
+sim4 <- complete
+sim4$job       <- prodNA( data.frame(job=complete$job) , sum(is.na(data.test$job))/ n)
+sim4$marital   <- prodNA( data.frame(marital=complete$marital) , sum(is.na(data.test$marital))/ n)
+sim4$education <- prodNA( data.frame(education=complete$education) , sum(is.na(data.test$education))/ n)
+sim4$default   <- prodNA( data.frame(default=complete$default) , sum(is.na(data.test$default))/ n)
+sim4$housing   <- prodNA( data.frame(housing=complete$housing) , sum(is.na(data.test$housing))/ n)
+sim4$loan      <- prodNA( data.frame(loan=complete$loan) , sum(is.na(data.test$loan))/ n)
+
+
+set.seed(5)
+sim5 <- complete
+sim5$job       <- prodNA( data.frame(job=complete$job) , sum(is.na(data.test$job))/ n)
+sim5$marital   <- prodNA( data.frame(marital=complete$marital) , sum(is.na(data.test$marital))/ n)
+sim5$education <- prodNA( data.frame(education=complete$education) , sum(is.na(data.test$education))/ n)
+sim5$default   <- prodNA( data.frame(default=complete$default) , sum(is.na(data.test$default))/ n)
+sim5$housing   <- prodNA( data.frame(housing=complete$housing) , sum(is.na(data.test$housing))/ n)
+sim5$loan      <- prodNA( data.frame(loan=complete$loan) , sum(is.na(data.test$loan))/ n)
+```
+
+## Imputation-missForest
+
+![missForest](Figures and Tables/missForestAlgorithm.PNG)
+
+The algorithm is very simple. First, it will impute all missing values with any method. Next step is reordering variables with increasing amount of missing values and imputing one variable at a time using random forest. When imputing a column, rows without missing in the column will be training set to fit a random forest and predict missing values with the random forest. It will continue untill the proportion of new imputed values is less than some criteria. This algorithm doen not require any estimation of parameter, therefore it is non parametric. 
+
+Now, let's impute missing of simulated date and see the accuracy.
+```{r, eval=F, echo=T}
+## missForest
+#library(missForest) 
+result1_mf <- missForest(sim1, xtrue = complete, verbose = TRUE)
+result2_mf <- missForest(sim2, xtrue = complete, verbose = TRUE)
+result3_mf <- missForest(sim3, xtrue = complete, verbose = TRUE)
+result4_mf <- missForest(sim4, xtrue = complete, verbose = TRUE)
+result5_mf <- missForest(sim5, xtrue = complete, verbose = TRUE)
+
+##PFC
+result1_mf # 0.1328233
+result2_mf # 0.1323983 
+result3_mf # 0.1310169 
+result4_mf # 0.1288917 
+result5_mf # 0.1325045 
+```
+
+## Imputation-MICE
+
+MICE also imputes one variable at a time. Unlike missForest, MICE assumes a parametric model. polytomous regression model is assumed in this data set since all variable with missing is categorical and the number of category is greater than 2. Originally, MICE is a mutiple imputation method, but we only create one final imputed dataset for each simulation dataset because our purpose is not estimating parameters precisely but comparing the two imputation method. Even though the number of multiple imputation is 1, we will see that it takes about 40 times longer than missForest.
+
+```{r, eval=F, echo=T}
+#library(mice)
+
+mice1 <- mice(sim1, m=1, maxit = 50, method = NULL, seed = 1)
+imputedData1_mice <- complete(mice1,1)
+
+
+mice2 <- mice(sim2, m=1, maxit = 50, method = NULL, seed = 1)
+imputedData2_mice <- complete(mice2,1)
+
+
+mice3 <- mice(sim3, m=1, maxit = 50, method = NULL, seed = 1)
+imputedData3_mice <- complete(mice3,1)
+
+
+mice4 <- mice(sim4, m=1, maxit = 50, method = NULL, seed = 1)
+imputedData4_mice <- complete(mice4,1)
+
+
+mice5 <- mice(sim5, m=1, maxit = 50, method = NULL, seed = 1)
+imputedData5_mice <- complete(mice5,1)
+
+
+sum(imputedData1_mice != complete)/sum(is.na(sim1)) #0.1577941
+sum(imputedData2_mice != complete)/sum(is.na(sim2)) #0.165551
+sum(imputedData3_mice != complete)/sum(is.na(sim3)) #0.1628945
+sum(imputedData4_mice != complete)/sum(is.na(sim4)) #0.1609818
+sum(imputedData5_mice != complete)/sum(is.na(sim5)) #0.1587504
+```
+missForest is faster and more accurate than MICE. Therefore, our final choice is missForest.
+
+# Now, Impute missing values in the full data using missForest
+```{r}
+#library(missForest)
+result_mf <- missForest(data.test, verbose = TRUE)
+imputedData <- result_mf$ximp
+#write_csv(imputedData, "imputedData.csv")
+```
+The final imputed dataset is named `imputedData` and it will be uploaded in our github.
+
+
+
+
+
+
+
