@@ -14,8 +14,10 @@ library(modelr)
 dat = read_csv("imputedData.csv")
 
 dat_lasso = dat %>% select(-duration, -default)
-dat_lasso$y = as.factor(ifelse(dat_lasso$y == "yes", 1, 0))
+dat_lasso$y = ifelse(dat_lasso$y == "yes", 1, 0)
 dat_lasso_matrix = model.matrix(y~., data=dat_lasso)
+dim(dat_lasso_matrix)
+set.seed(4)
 cv_lasso = cv.glmnet(dat_lasso_matrix, dat_lasso$y, alpha = 1, nfolds = 5,
                      family = "binomial", type.measure = "auc")
 plot(cv_lasso)
@@ -23,6 +25,42 @@ plot(cv_lasso)
 
 
 I first tried using LASSO to run logistic regression for feature selection. AUC was used as the metric and 5-fold cross validation was used. As we can see, the AUC almost monotonically decreased as the regularization parameter $\lambda$ increases, suggesting that there is actually little need to perform a feature selection. Therefore I will just use the classical logistic regression.
+
+
+First we compare the results of self written logistic regression results and the results obtained from `glm` function.
+
+
+```{r}
+source("code-logistic.R")
+
+start = Sys.time()
+glm_logit = glm(y ~ ., data = dat_lasso, family = "binomial")
+end = Sys.time()
+time_glm = end - start
+
+start = Sys.time()
+self_logit = logistic(X = dat_lasso_matrix, Y = dat_lasso$y)
+end = Sys.time()
+time_logit = end - start
+
+print(tibble("glm" = time_glm, "self written" = time_logit))
+# glm took 1.05 seconds, self written function took 18.06 min
+
+glm_result = tibble(names(self_logit), glm_logit$coefficients, self_logit)
+colnames(glm_result) = c("varname", "glm", "self written")
+glm_result %>%
+  gather(glm, `self written`, key = "method", value = "estimates") %>%
+  ggplot() +
+  geom_col(aes(x = varname, y = log(abs(estimates)), fill = method), position = position_dodge()) +
+  labs(x = "Covariates", y = "Log of the absolute value of the estimates") +
+  theme(axis.title = element_text(size = 12)) + 
+  scale_x_discrete(labels = NULL)
+```
+
+
+We see that these two results match perfectly, showing that the self written codes converged and produced correct results. We also see that the self written codes took way more time to run on this big dataset than the base R version.
+
+
 
 ```{r, message=FALSE}
 set.seed(2020)
@@ -39,8 +77,8 @@ for (i in 1:5){
 logistic_pred = logistic_pred %>%
   mutate(pred_cat = ifelse(pred>=0.5, 1, 0))
 
-sum(logistic_pred$y == logistic_pred$pred_cat) / dim(dat)[1]
 pROC::roc(logistic_pred$y, logistic_pred$pred)$auc
+confusionMatrix(as.factor(logistic_pred$pred_cat), as.factor(logistic_pred$y))
 ```
 
-We use a five fold cross validation to produce prediction for every subject. Using logistic regression, we could achieve a prediction accuracy of 0.899, and an AUC of 0.78.
+We use a five fold cross validation to produce prediction for every subject. Using logistic regression, we could achieve a prediction accuracy of 0.899, an AUC of 0.78 and a Kappa statistic of 0.289.
