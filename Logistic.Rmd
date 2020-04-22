@@ -36,15 +36,24 @@ source("code-logistic.R")
 start = Sys.time()
 glm_logit = glm(y ~ ., data = dat_lasso, family = "binomial")
 end = Sys.time()
-time_glm = end - start
+time_glm = difftime(end, start, units = "secs")
 
 start = Sys.time()
 self_logit = logistic(X = dat_lasso_matrix, Y = dat_lasso$y)
 end = Sys.time()
-time_logit = end - start
+time_logit = difftime(end, start, units = "secs")
 
-print(tibble("glm" = time_glm, "self written" = time_logit))
+logit_time = tibble("glm" = as.numeric(time_glm), "self written" = as.numeric(time_logit))
+print(logit_time)
 # glm took 1.05 seconds, self written function took 18.06 min
+
+logit_time %>%
+  gather(key = "method", value = "time") %>%
+  ggplot(aes(x = method, y = time)) +
+  geom_col(fill = "deepskyblue3", position = position_dodge()) +
+  geom_point() +
+  theme(text = element_text(size = 12))
+  
 
 glm_result = tibble(names(self_logit), glm_logit$coefficients, self_logit)
 colnames(glm_result) = c("varname", "glm", "self written")
