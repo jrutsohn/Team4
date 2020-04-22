@@ -185,155 +185,97 @@ summary {
 </div>
 
 
-<pre class="r"><code>library(tidyverse)</code></pre>
-<pre><code>## Warning: package 'tidyverse' was built under R version 3.6.2</code></pre>
-<pre><code>## -- Attaching packages ------------------------------------------------------ tidyverse 1.3.0 --</code></pre>
-<pre><code>## v ggplot2 3.2.1     v purrr   0.3.3
-## v tibble  2.1.3     v dplyr   0.8.3
-## v tidyr   1.0.2     v stringr 1.4.0
-## v readr   1.3.1     v forcats 0.4.0</code></pre>
-<pre><code>## Warning: package 'ggplot2' was built under R version 3.6.2</code></pre>
-<pre><code>## Warning: package 'tidyr' was built under R version 3.6.2</code></pre>
-<pre><code>## Warning: package 'readr' was built under R version 3.6.2</code></pre>
-<pre><code>## Warning: package 'stringr' was built under R version 3.6.2</code></pre>
-<pre><code>## Warning: package 'forcats' was built under R version 3.6.2</code></pre>
-<pre><code>## -- Conflicts --------------------------------------------------------- tidyverse_conflicts() --
-## x dplyr::filter() masks stats::filter()
-## x dplyr::lag()    masks stats::lag()</code></pre>
-<pre class="r"><code>library(caret)</code></pre>
-<pre><code>## Warning: package 'caret' was built under R version 3.6.2</code></pre>
-<pre><code>## Loading required package: lattice</code></pre>
-<pre><code>## 
-## Attaching package: 'caret'</code></pre>
-<pre><code>## The following object is masked from 'package:purrr':
-## 
-##     lift</code></pre>
-<pre class="r"><code>dat = read_csv(&quot;imputedData.csv&quot;)</code></pre>
-<pre><code>## Parsed with column specification:
-## cols(
-##   age = col_double(),
-##   job = col_character(),
-##   marital = col_character(),
-##   education = col_character(),
-##   default = col_character(),
-##   housing = col_character(),
-##   loan = col_character(),
-##   contact = col_character(),
-##   duration = col_double(),
-##   campaign = col_double(),
-##   pdays = col_double(),
-##   previous = col_double(),
-##   poutcome = col_character(),
-##   emp.var.rate = col_double(),
-##   cons.price.idx = col_double(),
-##   cons.conf.idx = col_double(),
-##   euribor3m = col_double(),
-##   nr.employed = col_double(),
-##   y = col_character()
-## )</code></pre>
-<pre class="r"><code>dat = dat %&gt;%
-  mutate(ID = row_number()) %&gt;%
-  select(ID, everything())
+<pre class="r"><code>library(tidyverse)
+library(caret)
+library(modelr)
 
-# To show codes on a smaller dataset:
-set.seed(735)
-dat_sel = sample_n(dat, 10000)
+dat = read_csv(&quot;imputedData.csv&quot;)
 
 ## duration was mentioned in the readme file that it should not be used
 ## default only has three people answering &quot;yes&quot;, so I am not using it
-dat_svm = dat_sel %&gt;% select(-ID, -duration, -default)
-dat_svm$y = as.factor(ifelse(dat_svm$y == &quot;yes&quot;, 1, 0))
+dat = dat %&gt;%
+  select(-duration, -default) %&gt;%
+  mutate(ID = row_number()) %&gt;%
+  select(ID, everything())
+dat$y = as.factor(ifelse(dat$y == &quot;yes&quot;, 1, 0))
 
-dat_svm_x = model.matrix(y~., data = dat_svm)
-trCtl &lt;- trainControl(method=&quot;cv&quot;, number=5, savePredictions=TRUE)
+# To show codes on a smaller dataset:
+set.seed(735)
+dat_train = sample_n(dat, 10000)
+dat_test = setdiff(dat, dat_train) %&gt;% select(-ID)
+dat_train = dat_train %&gt;% select(-ID)
 
+logit = glm(y ~ ., data = dat_train, family=&quot;binomial&quot;)
+logistic_pred = add_predictions(dat_test, logit, type = &quot;response&quot;)
 
-# svm with radial kernel
-start = Sys.time()
-svmRad = train(dat_svm_x, dat_svm$y, method = &quot;svmRadial&quot;, 
-               tuneLength = 5, trControl = trCtl)</code></pre>
-<pre><code>## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.</code></pre>
-<pre><code>## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
+logistic_pred = logistic_pred %&gt;%
+  mutate(pred_cat = ifelse(pred&gt;=0.5, 1, 0))
 
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.
-
-## Warning in .local(x, ...): Variable(s) `' constant. Cannot scale data.</code></pre>
-<pre class="r"><code>end = Sys.time()
-time_svmRad = end - start
-print(time_svmRad)</code></pre>
-<pre><code>## Time difference of 4.73461 mins</code></pre>
-<pre class="r"><code>dat_svm$predict = svmRad$finalModel@fitted
-confusionMatrix(dat_svm$predict, dat_svm$y)</code></pre>
+confusionMatrix(as.factor(logistic_pred$pred_cat), as.factor(logistic_pred$y))</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
-## Prediction    0    1
-##          0 8779  839
-##          1   83  299
+## Prediction     0     1
+##          0 27241  2678
+##          1   445   824
+##                                           
+##                Accuracy : 0.8999          
+##                  95% CI : (0.8965, 0.9032)
+##     No Information Rate : 0.8877          
+##     P-Value [Acc &gt; NIR] : 2.632e-12       
+##                                           
+##                   Kappa : 0.3038          
+##                                           
+##  Mcnemar's Test P-Value : &lt; 2.2e-16       
+##                                           
+##             Sensitivity : 0.9839          
+##             Specificity : 0.2353          
+##          Pos Pred Value : 0.9105          
+##          Neg Pred Value : 0.6493          
+##              Prevalence : 0.8877          
+##          Detection Rate : 0.8734          
+##    Detection Prevalence : 0.9593          
+##       Balanced Accuracy : 0.6096          
+##                                           
+##        'Positive' Class : 0               
+## </code></pre>
+<pre class="r"><code>trCtl &lt;- trainControl(method=&quot;cv&quot;, number=5, savePredictions=TRUE)
+
+# svm with radial kernel
+set.seed(4735)
+start = Sys.time()
+svmRad = train(y ~ ., data = dat_train, method = &quot;svmRadial&quot;, 
+               tuneLength = 10, trControl = trCtl, metric = &quot;Kappa&quot;)
+end = Sys.time()
+time_svmRad = end - start
+print(time_svmRad)</code></pre>
+<pre><code>## Time difference of 7.505129 mins</code></pre>
+<pre class="r"><code>svm_pred = add_predictions(dat_test, svmRad)
+confusionMatrix(svm_pred$pred, svm_pred$y)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction     0     1
+##          0 27281  2755
+##          1   405   747
 ##                                          
-##                Accuracy : 0.9078         
-##                  95% CI : (0.902, 0.9134)
-##     No Information Rate : 0.8862         
-##     P-Value [Acc &gt; NIR] : 1.418e-12      
+##                Accuracy : 0.8987         
+##                  95% CI : (0.8953, 0.902)
+##     No Information Rate : 0.8877         
+##     P-Value [Acc &gt; NIR] : 2.593e-10      
 ##                                          
-##                   Kappa : 0.3566         
+##                   Kappa : 0.281          
 ##                                          
 ##  Mcnemar's Test P-Value : &lt; 2.2e-16      
 ##                                          
-##             Sensitivity : 0.9906         
-##             Specificity : 0.2627         
-##          Pos Pred Value : 0.9128         
-##          Neg Pred Value : 0.7827         
-##              Prevalence : 0.8862         
-##          Detection Rate : 0.8779         
-##    Detection Prevalence : 0.9618         
-##       Balanced Accuracy : 0.6267         
+##             Sensitivity : 0.9854         
+##             Specificity : 0.2133         
+##          Pos Pred Value : 0.9083         
+##          Neg Pred Value : 0.6484         
+##              Prevalence : 0.8877         
+##          Detection Rate : 0.8747         
+##    Detection Prevalence : 0.9631         
+##       Balanced Accuracy : 0.5993         
 ##                                          
 ##        'Positive' Class : 0              
 ## </code></pre>

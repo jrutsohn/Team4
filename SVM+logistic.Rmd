@@ -1,0 +1,52 @@
+---
+title: "SVM"
+author: "Tianyou Luo"
+date: "April 21, 2020"
+output: html_document
+---
+
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(caret)
+library(modelr)
+
+dat = read_csv("imputedData.csv")
+
+## duration was mentioned in the readme file that it should not be used
+## default only has three people answering "yes", so I am not using it
+dat = dat %>%
+  select(-duration, -default) %>%
+  mutate(ID = row_number()) %>%
+  select(ID, everything())
+dat$y = as.factor(ifelse(dat$y == "yes", 1, 0))
+
+# To show codes on a smaller dataset:
+set.seed(735)
+dat_train = sample_n(dat, 10000)
+dat_test = setdiff(dat, dat_train) %>% select(-ID)
+dat_train = dat_train %>% select(-ID)
+
+logit = glm(y ~ ., data = dat_train, family="binomial")
+logistic_pred = add_predictions(dat_test, logit, type = "response")
+
+logistic_pred = logistic_pred %>%
+  mutate(pred_cat = ifelse(pred>=0.5, 1, 0))
+
+confusionMatrix(as.factor(logistic_pred$pred_cat), as.factor(logistic_pred$y))
+
+trCtl <- trainControl(method="cv", number=5, savePredictions=TRUE)
+
+# svm with radial kernel
+set.seed(4735)
+start = Sys.time()
+svmRad = train(y ~ ., data = dat_train, method = "svmRadial", 
+               tuneLength = 10, trControl = trCtl, metric = "Kappa")
+end = Sys.time()
+time_svmRad = end - start
+print(time_svmRad)
+
+svm_pred = add_predictions(dat_test, svmRad)
+confusionMatrix(svm_pred$pred, svm_pred$y)
+```
+
