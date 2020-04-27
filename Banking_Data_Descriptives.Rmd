@@ -10,23 +10,27 @@ setwd("/Users/jrutsohn/Desktop/Spring 2020 Texts/BIOS 735/bank-additional")
 library(ggplot2)
 library(magrittr)
 library(psych)
+library(scales)
 
 data.test <- read.csv("bank-additional-full.csv",header=T,sep=';')
 
+data.test$pdays[data.test$pdays==999] <- 0 #Never Contacted
+data.test$pdays[data.test$pdays< 999] <- 1 #Was Contacted
 
 pairs.panels(data.test[,-c(2:10,13,15,21)])
 
 describe(data.test[,-c(2:10,13,15,21)])
-ggplot(data=data.test) + geom_bar(aes(x=job))
-ggplot(data=data.test) + geom_bar(aes(x=marital))
-ggplot(data=data.test) + geom_bar(aes(x=education))
-ggplot(data=data.test) + geom_bar(aes(x=default))
-ggplot(data=data.test) + geom_bar(aes(x=housing))
-ggplot(data=data.test) + geom_bar(aes(x=loan))
-ggplot(data=data.test) + geom_bar(aes(x=contact))
-ggplot(data=data.test) + geom_bar(aes(x=month))
-ggplot(data=data.test) + geom_bar(aes(x=day_of_week))
-ggplot(data=data.test) + geom_bar(aes(x=poutcome))
-ggplot(data=data.test) + geom_bar(aes(x=y))
+ggplot(data=data.test) + geom_bar(aes(x=job)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=data.test) + geom_bar(aes(x=marital)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=data.test) + geom_bar(aes(x=education)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=data.test) + geom_bar(aes(x=default)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=data.test) + geom_bar(aes(x=housing)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=data.test) + geom_bar(aes(x=loan)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=data.test) + geom_bar(aes(x=contact)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=data.test) + geom_bar(aes(x=month)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=data.test) + geom_bar(aes(x=day_of_week)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=data.test) + geom_bar(aes(x=poutcome)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=data.test) + geom_bar(aes(x=pdays)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=data.test) + geom_bar(aes(x=y)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 

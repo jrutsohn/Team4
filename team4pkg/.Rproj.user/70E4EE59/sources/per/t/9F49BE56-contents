@@ -1,0 +1,25 @@
+Package: team4pkg
+Title: Predicting Term Deposit using Economic and Characteristic Features
+Version: 1.0.0
+Authors@R: 
+    person(given = "Team",
+           family = "Four",
+           role = c("aut", "cre"),
+           email = "jrutsohn@live.unc.edu",
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: This package uses the Bank Marketing Data Set from the UC-Irvine Machine Learning Repository in order to determine which features best predict whether a client will open a term deposit  Data come from Portuguese banking instituion that ran direct marketing campaign on current clients.
+License: GPL-2
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.0.2
+Imports: 
+    ggplot2,
+    caret,
+    data.table,
+    naniar,
+    missForest,
+    dplyr,
+    magrittr,
+    mice
+Suggests: 
+    testthat (>= 2.1.0)
